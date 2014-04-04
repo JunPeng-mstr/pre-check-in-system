@@ -97,7 +97,7 @@ class TriggerRequest:
             #@Step 3: Check jobs needed to be triggerred
             jobs = opts.GetJobs(commit_info)
             if not jobs:
-                log.warning(NoValidJobFoundError.message)
+                log.warning(NoValidJobFoundError().message)
                 return HTTPAdaptor.format_response("ok", "001", "No tests can be executed.")
             
             #@Step 4: Insert commit info
