@@ -98,7 +98,7 @@ class TriggerRequest:
             jobs = opts.GetJobs(commit_info)
             if not jobs:
                 log.warning(NoValidJobFoundError().message)
-                return HTTPAdaptor.format_response("ok", "001", "No tests can be executed.")
+                return HTTPAdaptor.format_response("pass", "001", "No tests can be executed.")
             
             #@Step 4: Insert commit info
             
@@ -112,7 +112,8 @@ class TriggerRequest:
             return HTTPAdaptor.format_response("ok", "003", "Jobs are triggered. Please wait for the response.")
         
         except Error, e:
-            return HTTPAdaptor.format_response("err", code = e.status, msg = e.message)
+            #let commit pass if test was not triggered successfully
+            return HTTPAdaptor.format_response("pass", code = e.status, msg = e.message)
         
         except Exception, e:
             return HTTPAdaptor.format_response("err", msg = "Server execution failed")
