@@ -432,8 +432,13 @@ class SQLAdaptor:
             cursor = conn.cursor()          
             cursor.execute(SQL_SELECT_COMMIT_STATUS, (transaction, revision))
             
-            for row in cursor:
-                status = row[0]
+            rows = cursor.fetchall()
+            if len(rows)==0:
+                log.error('No tests were executed or result was not inserted!')
+                status = 15
+            else:
+                for row in rows:
+                    status = row[0]
                            
         except Exception, e:
             log.error('Check status failed')
