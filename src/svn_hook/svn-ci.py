@@ -535,7 +535,7 @@ def notify_cvproxy (opts, config):
             logging.debug("status_id: %s" % status_id)
             current_time = datetime.utcnow()
             timespan = current_time - start_time
-            if status_id in (1,5,13):
+            if status_id in (1,5,13,15):
                 break
             elif status_id in (2,6,8,9,10,11):
                 sys.exit("Your commit has been rejected due to test failures.")
@@ -555,7 +555,7 @@ def notify_cvproxy (opts, config):
 
             
     except Exception, e:
-        logging.error(e)
+        logging.exception(e)
         sys.exit("Something wrong with the hook scripts. Please contact the administrator!")
     
         
