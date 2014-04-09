@@ -92,7 +92,7 @@ def __get_repo_info_from_entries(workspace):
     '''    
     entries_file = os.path.join(workspace,".svn/entries")    
     if not os.path.exists(entries_file):
-        raise
+        raise Exception("The entries file doesn't exist: %s"%entries_file)
     try: 
         dom1 = parse(entries_file) # parse an XML file by name
         
@@ -109,7 +109,7 @@ def __get_repo_info_from_entries(workspace):
                 repos.append(line.lstrip()[0:-1])
     print "Repos: %s" % repos
     if not repos.__len__() == 2:
-        raise
+        raise Exception("The len of repo info should be 2!")
     
     if repos[0].__len__() > repos[1].__len__():
         repo_piece = urllib.unquote(repos[0][repos[1].__len__():]) 
@@ -185,7 +185,7 @@ def __handle_remove_readonly(func, path, exc):
         os.chmod(path, stat.S_IRWXU| stat.S_IRWXG| stat.S_IRWXO) # 0777
         func(path)
     else:
-        raise
+        raise Exception("Cannot handle remove_readonly")
     
 if __name__ == "__main__":
     global server_url
