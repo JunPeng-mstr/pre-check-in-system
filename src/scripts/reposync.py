@@ -5,13 +5,17 @@ Created on Jul 31, 2012
 '''
 import os, json, re, urllib, sys, urllib2, base64, errno, stat, shutil
 from xml.dom.minidom import parse
+from subprocess import Popen, PIPE
 
-metric = '.*//.*/.*' #metric to match the repos path
+#metric = '.*//.*/.*' #metric to match the repos path
 
 def get_changes():
     changes_str = os.environ['changes']
-    changes_str = changes_str[1:-1]
-    print "changes: %s" % changes_str
+    print "os.environ['changes']: %s" % changes_str
+    changes_str = changes_str.strip()
+    if not changes_str.startswith('[['): 
+        changes_str = changes_str[1:-1]
+    print "Changes: %s" % changes_str
     try:
         print "Convert changes string to json format"
         changes_json = json.loads(changes_str)
@@ -23,20 +27,20 @@ def get_changes():
 
 def apply_changes(path = None, changes = None):
     try:
-        global metric
+        #global metric
         #get the workspace directory
         if path:
             workspace = path
         else:
             workspace = os.environ['WORKSPACE']    
-        repo_piece = __get_repo_info_from_entries(workspace)
+        repo_piece = __get_repo_info()
         print "Repo piece: %s" % repo_piece
         if not changes:
             sys.exit("No changes found") 
         for change in changes:
             path = change[1][repo_piece.__len__():].encode('utf-8')
             path = path[1:] if path.startswith("/") else path
-            basepath = os.environ["WORKSPACE"]
+            basepath = workspace
             fullpath = os.path.join(basepath, path)
             if __is_file(path):
                 if not change[0] == "D":
@@ -84,42 +88,79 @@ def __get_file(filename):
     print "file url:%s" % url
     file_content = __get_url(url)
     return file_content
-    
-def __get_repo_info_from_entries(workspace):
+ 
+def __get_repo_info():
     '''
-    Get repo info from .svn/entries. 
-    To do:Support two formats: xml and plain text 
+    Get repo info from command: svn info. 
+    Run this script in the directory where the .svn folder is located 
+    .svn/entries is not supported in SVN 1.7 above
     '''    
-    entries_file = os.path.join(workspace,".svn/entries")    
-    if not os.path.exists(entries_file):
-        raise Exception("The entries file doesn't exist: %s"%entries_file)
-    try: 
-        dom1 = parse(entries_file) # parse an XML file by name
+    cmd = 'svn info'
+    try:
+        process = Popen(cmd, stdin = PIPE, stdout = PIPE)
+        output, status = process.communicate()
+        svnInfo_json = [output]
+        if output.find('\r\n') != -1:
+            svnInfo_json = output.split('\r\n')
+        elif output.find('\n') != -1:
+            svnInfo_json = output.split('\n')
+        else:
+            raise Exception("Command failed: svn info")
+
+        svnInfo_dict = {}
+        for info in svnInfo_json:
+            infoMap = info.split(':', 1)
+            if len(infoMap) == 2:
+                svnInfo_dict[infoMap[0]] = infoMap[1]
         
-    except:
-        print "Entries file is not xml format. Switch to plain text mode!"
-    repos = []
-    p = re.compile(metric)
-    print "Metric: %s" % metric
-    with open(entries_file) as efile:
-        for line in efile:
-            if repos.__len__() == 2:
-                break
-            if p.match(line):                
-                repos.append(line.lstrip()[0:-1])
-    print "Repos: %s" % repos
-    if not repos.__len__() == 2:
-        raise Exception("The len of repo info should be 2!")
-    
-    if repos[0].__len__() > repos[1].__len__():
-        repo_piece = urllib.unquote(repos[0][repos[1].__len__():]) 
-    else:
-        repo_piece = urllib.unquote(repos[1][repos[0].__len__():])
-    print "Repo_piece: %s" % repo_piece
-    if repo_piece[0] == "/":
-        return repo_piece[1:]
-    else:
-        return repo_piece    
+        svn_url = svnInfo_dict['URL']
+        svn_rootRepo = svnInfo_dict['Repository Root']
+        print "SVN URL: %s" % svn_url
+        print "SVN Root Repo: %s" % svn_rootRepo
+        repo_piece = urllib.unquote(svn_url[svn_rootRepo.__len__():]) 
+        #print "Repo_piece: %s" % repo_piece
+        if repo_piece[0] == "/":
+            repo_piece = repo_piece[1:]
+        return repo_piece   
+    except Exception,e: 
+        print "command failed"
+        print e  
+       
+#def __get_repo_info_from_entries(workspace):
+#    '''
+#    Get repo info from .svn/entries. 
+#    To do:Support two formats: xml and plain text 
+#    '''    
+#    entries_file = os.path.join(workspace,".svn/entries")    
+#    if not os.path.exists(entries_file):
+#        raise
+#    try: 
+#        dom1 = parse(entries_file) # parse an XML file by name
+#        
+#    except:
+#        print "Entries file is not xml format. Switch to plain text mode!"
+#    repos = []
+#    p = re.compile(metric)
+#    print "Metric: %s" % metric
+#    with open(entries_file) as efile:
+#        for line in efile:
+#            if repos.__len__() == 2:
+#                break
+#            if p.match(line):                
+#                repos.append(line.lstrip()[0:-1])
+#    print "Repos: %s" % repos
+#    if not repos.__len__() == 2:
+#        raise
+#    
+#    if repos[0].__len__() > repos[1].__len__():
+#        repo_piece = urllib.unquote(repos[0][repos[1].__len__():]) 
+#    else:
+#        repo_piece = urllib.unquote(repos[1][repos[0].__len__():])
+#    print "Repo_piece: %s" % repo_piece
+#    if repo_piece[0] == "/":
+#        return repo_piece[1:]
+#    else:
+#        return repo_piece    
 
 def __is_file(path):
     if path.endswith("/"):
@@ -185,7 +226,7 @@ def __handle_remove_readonly(func, path, exc):
         os.chmod(path, stat.S_IRWXU| stat.S_IRWXG| stat.S_IRWXO) # 0777
         func(path)
     else:
-        raise Exception("Cannot handle remove_readonly")
+        raise
     
 if __name__ == "__main__":
     global server_url
@@ -194,11 +235,7 @@ if __name__ == "__main__":
 #    os.environ["WORKSPACE"] = "/usr/local/workspace/pre-check-in-trail"
 #    os.environ["uuid"] = "274f8cb5-5abf-4111-8702-94e20f53315e"
 #    os.environ["transaction"] = "11-f"
+    '''Make sure to run this script in the directory where the .svn folder is located 
+    and it's better to use this directory as CI job workspace'''
     changes = get_changes()
     apply_changes(changes = changes) 
-    
-        
-                
-                
-        
-    
